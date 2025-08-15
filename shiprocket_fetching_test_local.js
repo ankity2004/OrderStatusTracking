@@ -1,19 +1,14 @@
 // index.js - Simple Shiprocket Webhook Receiver
 const express = require('express');
 const bodyParser = require('body-parser');
-
 const app = express();
-
 // Middleware
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-
 // Store webhook data in memory (for demo purposes)
 let webhookData = [];
-
 // Configuration
 const PORT = process.env.PORT || 3000;
-
 // Main webhook endpoint - receives data from Shiprocket
 app.post('/webhook', (req, res) => {
   try {
@@ -50,6 +45,51 @@ app.post('/webhook', (req, res) => {
   }
 });
 
+// Delete webhook data from index to index
+app.delete('/data/:fromIndex/:toIndex', (req, res) => {
+  try {
+    const fromIndex = parseInt(req.params.fromIndex);
+    const toIndex = parseInt(req.params.toIndex);
+    
+    if (isNaN(fromIndex) || isNaN(toIndex)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid indices. Both fromIndex and toIndex must be numbers.'
+      });
+    }
+    
+    if (fromIndex < 0 || toIndex < 0 || fromIndex >= webhookData.length || toIndex >= webhookData.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'Indices out of range.'
+      });
+    }
+    
+    if (fromIndex > toIndex) {
+      return res.status(400).json({
+        success: false,
+        message: 'fromIndex should be less than or equal to toIndex.'
+      });
+    }
+    
+    const deletedItems = webhookData.splice(fromIndex, toIndex - fromIndex + 1);
+    
+    res.json({
+      success: true,
+      message: `Deleted ${deletedItems.length} items from index ${fromIndex} to ${toIndex}`,
+      deletedCount: deletedItems.length,
+      remainingCount: webhookData.length
+    });
+    
+  } catch (error) {
+    console.error('❌ Error deleting data:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting data'
+    });
+  }
+});
+
 // Display webhook data in browser as JSON
 app.get('/', (req, res) => {
   res.setHeader('Content-Type', 'application/json');
@@ -60,7 +100,6 @@ app.get('/', (req, res) => {
     latest_webhooks: webhookData
   });
 });
-
 // Alternative endpoint to view data with better formatting
 app.get('/data', (req, res) => {
   res.setHeader('Content-Type', 'text/html');
@@ -100,7 +139,6 @@ app.get('/data', (req, res) => {
   `;
   res.send(html);
 });
-
 // Health check
 app.get('/health', (req, res) => {
   res.json({ 
@@ -109,15 +147,9 @@ app.get('/health', (req, res) => {
     webhooks_received: webhookData.length 
   });
 });
-
 // Start server
 app.listen(PORT, () => {
   console.log(`\n🚀 Shiprocket Webhook Receiver Started`);
-  console.log(`📡 Server running on http://localhost:${PORT}`);
-  console.log(`🔗 Webhook URL: http://localhost:${PORT}/webhook`);
-  console.log(`📊 View data: http://localhost:${PORT}/data`);
-  console.log(`📋 Raw JSON: http://localhost:${PORT}/`);
 });
-
 // For Vercel deployment
 module.exports = app;
